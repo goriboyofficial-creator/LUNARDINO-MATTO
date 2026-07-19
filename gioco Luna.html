@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Corridoio Loot</title>
+<style>
+body {
+    margin: 0;
+    background: black;
+    color: white;
+    font-family: Arial;
+    overflow: hidden;
+}
+
+#game {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    perspective: 800px;
+}
+
+.locker {
+    position: absolute;
+    width: 60px;
+    height: 100px;
+    background: #777;
+    border: 2px solid #222;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.locker:hover {
+    background: #aaa;
+}
+
+#lootBox {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.9);
+    padding: 20px;
+    border: 1px solid white;
+    display: none;
+}
+
+#forwardBtn {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    padding: 15px;
+    background: white;
+    color: black;
+    cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<div id="game"></div>
+
+<div id="lootBox">LOOT</div>
+<div id="forwardBtn">AVANTI</div>
+
+<script>
+let posizione = 0;
+const game = document.getElementById("game");
+const lootBox = document.getElementById("lootBox");
+
+function genera() {
+    game.innerHTML = "";
+
+    for (let i = 0; i < 12; i++) {
+        crea(i, "left");
+        crea(i, "right");
+    }
+}
+
+function crea(i, lato) {
+    let locker = document.createElement("div");
+    locker.className = "locker";
+
+    let scale = 1 - i * 0.05;
+    let y = i * 70;
+    let x = lato === "left" ? 30 - i*2 : 70 + i*2;
+
+    locker.style.top = y + "%";
+    locker.style.left = x + "%";
+    locker.style.transform = scale(${scale});
+
+    locker.onclick = () => {
+        lootBox.style.display = "block";
+        lootBox.innerText = loot();
+    };
+
+    game.appendChild(locker);
+}
+
+function loot() {
+    const roba = ["loot", "loot", "loot", "???", "vuoto", "loot raro"];
+    return roba[Math.floor(Math.random() * roba.length)];
+}
+
+document.getElementById("forwardBtn").onclick = () => {
+    posizione++;
+    genera();
+};
+
+genera();
+</script>
+
+</body>
+</html>
