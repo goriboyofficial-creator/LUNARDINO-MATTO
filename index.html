@@ -2,111 +2,128 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<title>Corridoio Loot</title>
+<title>Lunardino Loot</title>
+
 <style>
 body {
-    margin: 0;
-    background: black;
-    color: white;
-    font-family: Arial;
-    overflow: hidden;
+    margin:0;
+    background:#111;
+    color:white;
+    font-family:Arial;
+    overflow:hidden;
 }
 
 #game {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
-    perspective: 800px;
-}e
-e
+    width:100vw;
+    height:100vh;
+    background:linear-gradient(#333,#111);
+    position:relative;
+}
+
 .locker {
-    position: absolute;
-    width: 60px;
-    height: 100px;
-    background: #777;
-    border: 2px solid #222;
-    cursor: pointer;
-    transition: transform 0.2s;
+    position:absolute;
+    width:70px;
+    height:120px;
+    background:#777;
+    border:4px solid #333;
+    cursor:pointer;
 }
 
 .locker:hover {
-    background: #aaa;
+    background:#aaa;
 }
 
-#lootBox {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0,0,0,0.9);
-    padding: 20px;
-    border: 1px solid white;
-    display: none;
+#loot {
+    display:none;
+    position:absolute;
+    top:40%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    background:black;
+    border:2px solid white;
+    padding:30px;
+    font-size:30px;
 }
 
-#forwardBtn {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    padding: 15px;
-    background: white;
-    color: black;
-    cursor: pointer;
+#avanti {
+    position:absolute;
+    bottom:30px;
+    right:30px;
+    padding:20px 40px;
+    font-size:20px;
+    cursor:pointer;
 }
+
 </style>
 </head>
+
 <body>
 
 <div id="game"></div>
 
-<div id="lootBox">LOOT</div>
-<div id="forwardBtn">AVANTI</div>
+<div id="loot">LOOT</div>
+
+<button id="avanti">AVANTI</button>
+
 
 <script>
-let posizione = 0;
-const game = document.getElementById("game");
-const lootBox = document.getElementById("lootBox");
 
-function genera() {
-    game.innerHTML = "";
+let passo=0;
+let game=document.getElementById("game");
+let loot=document.getElementById("loot");
 
-    for (let i = 0; i < 12; i++) {
-        crea(i, "left");
-        crea(i, "right");
-    }
+
+function creaArmadietti(){
+
+game.innerHTML="";
+
+for(let i=0;i<6;i++){
+
+let sinistra=document.createElement("div");
+sinistra.className="locker";
+
+sinistra.style.left="15%";
+sinistra.style.top=(100+i*100)+"px";
+
+sinistra.onclick=function(){
+loot.style.display="block";
+loot.innerHTML="LOOT";
 }
 
-function crea(i, lato) {
-    let locker = document.createElement("div");
-    locker.className = "locker";
+game.appendChild(sinistra);
 
-    let scale = 1 - i * 0.05;
-    let y = i * 70;
-    let x = lato === "left" ? 30 - i*2 : 70 + i*2;
 
-    locker.style.top = y + "%";
-    locker.style.left = x + "%";
-    locker.style.transform = scale(${scale});
 
-    locker.onclick = () => {
-        lootBox.style.display = "block";
-        lootBox.innerText = loot();
-    };
+let destra=document.createElement("div");
+destra.className="locker";
 
-    game.appendChild(locker);
+destra.style.right="15%";
+destra.style.top=(100+i*100)+"px";
+
+destra.onclick=function(){
+loot.style.display="block";
+loot.innerHTML="LOOT";
 }
 
-function loot() {
-    const roba = ["loot", "loot", "loot", "???", "vuoto", "loot raro"];
-    return roba[Math.floor(Math.random() * roba.length)];
+game.appendChild(destra);
+
 }
 
-document.getElementById("forwardBtn").onclick = () => {
-    posizione++;
-    genera();
-};
+}
 
-genera();
+
+document.getElementById("avanti").onclick=function(){
+
+passo++;
+
+creaArmadietti();
+
+}
+
+
+
+creaArmadietti();
+
 </script>
 
 </body>
