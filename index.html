@@ -198,3 +198,199 @@ creaArmadietti();
 
 </body>
 </html>
+[15:41, 20/07/2026] Gori Boy: <!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Corridoio Loot</title>
+
+<style>
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+  font-family: Arial;
+}
+
+/* SCENA */
+.scene {
+  perspective: 1200px;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* CORRIDOIO */
+.corridor {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+
+/* PAVIMENTO */
+.floor {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(#555, #111);
+  transform: rotateX(75deg) translateZ(-200px);
+}
+
+/* PARETI */
+.wall {
+  position: absolute;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(#555, #222);
+}
+
+.left {
+  left: 0;
+  transform: rotateY(15deg);
+}
+
+.right {
+  right: 0;
+  transform: rotateY(-15deg);
+}
+
+/* ARMADIETTI */
+.locker {
+  width: 120px;
+  height: 180px;
+  background: linear-gradient(#3b82c4, #1f4e7a);
+  margin: 20px;
+  border-radius: 6px;
+  position: relative;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  transition: transform 0.2s;
+}
+
+.locker:hover {
+  transform: scale(1.1);
+}
+
+/* MANIGLIA */
+.handle {
+  width: 10px;
+  height: 40px;
+  background: #ddd;
+  position: absolute;
+  right: 10px;
+  top: 70px;
+  border-radius: 3px;
+}
+
+/* COLONNE ARMADIETTI */
+.side {
+  position: absolute;
+  top: 50px;
+  display: flex;
+  flex-direction: column;
+}
+
+.leftSide {
+  left: 50px;
+}
+
+.rightSide {
+  right: 50px;
+}
+
+/* LOOT */
+.loot {
+  position: absolute;
+  color: yellow;
+  font-weight: bold;
+  font-size: 20px;
+  pointer-events: none;
+  animation: fade 1s forwards;
+}
+
+@keyframes fade {
+  0% {opacity:1; transform:translateY(0);}
+  100% {opacity:0; transform:translateY(-40px);}
+}
+
+/* BOTTONE */
+button {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  padding: 12px 25px;
+  font-size: 18px;
+  cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div class="scene">
+  <div class="corridor" id="corridor">
+    <div class="floor"></div>
+    <div class="wall left"></div>
+    <div class="wall right"></div>
+
+    <div class="side leftSide" id="leftSide"></div>
+    <div class="side rightSide" id="rightSide"></div>
+  </div>
+</div>
+
+<button onclick="avanza()">AVANTI</button>
+
+<script>
+const leftSide = document.getElementById("leftSide");
+const rightSide = document.getElementById("rightSide");
+
+function creaArmadietti() {
+  leftSide.innerHTML = "";
+  rightSide.innerHTML = "";
+
+  for (let i = 0; i < 5; i++) {
+    leftSide.appendChild(creaLocker());
+    rightSide.appendChild(creaLocker());
+  }
+}
+
+function creaLocker() {
+  const locker = document.createElement("div");
+  locker.className = "locker";
+
+  const handle = document.createElement("div");
+  handle.className = "handle";
+
+  locker.appendChild(handle);
+
+  locker.onclick = function(e) {
+    const loot = document.createElement("div");
+    loot.className = "loot";
+    loot.innerText = "LOOT";
+
+    loot.style.left = e.clientX + "px";
+    loot.style.top = e.clientY + "px";
+
+    document.body.appendChild(loot);
+    setTimeout(() => loot.remove(), 1000);
+  };
+
+  return locker;
+}
+
+function avanza() {
+  const corr = document.getElementById("corridor");
+
+  corr.style.transform = "translateZ(-200px)";
+
+  setTimeout(() => {
+    corr.style.transform = "translateZ(0)";
+    creaArmadietti();
+  }, 300);
+}
+
+creaArmadietti();
+</script>
+
+</body>
+</html>
