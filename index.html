@@ -2,166 +2,199 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<title>Lunardino Loot</title>
+<title>Gioco Corridoio Loot</title>
 
 <style>
 body {
-    margin:0;
-    overflow:hidden;
-    background:black;
-    font-family:Arial;
+  margin: 0;
+  overflow: hidden;
+  background: #111;
+  font-family: Arial;
 }
 
 /* SCENA */
-#game {
-    perspective: 900px;
-    width:100vw;
-    height:100vh;
-    position:relative;
+.scene {
+  perspective: 900px;
+  width: 100vw;
+  height: 100vh;
+  position: relative;
 }
 
 /* CORRIDOIO */
-#corridor {
-    position:absolute;
-    width:100%;
-    height:100%;
-    transform-style: preserve-3d;
-    transition: transform 0.6s ease;
+.corridor {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
 }
 
 /* PAVIMENTO */
 .floor {
-    position:absolute;
-    width:100%;
-    height:100%;
-    background:linear-gradient(#555,#111);
-    transform: rotateX(75deg) translateZ(-300px);
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(#666, #222);
+  transform: rotateX(90deg) translateZ(-200px);
 }
 
 /* PARETI */
 .wall {
-    position:absolute;
-    width:50%;
-    height:100%;
-    background:linear-gradient(#333,#111);
+  position: absolute;
+  width: 300px;
+  height: 100%;
+  background: #444;
 }
 
 .left {
-    left:0;
-    transform: rotateY(25deg);
+  left: 0;
+  transform: rotateY(20deg);
 }
 
 .right {
-    right:0;
-    transform: rotateY(-25deg);
-}
-
-/* LUCI */
-.light {
-    position:absolute;
-    width:80px;
-    height:10px;
-    background:white;
-    top:20px;
-    left:50%;
-    transform:translateX(-50%);
-    box-shadow:0 0 20px white;
+  right: 0;
+  transform: rotateY(-20deg);
 }
 
 /* ARMADIETTI */
 .locker {
-    position:absolute;
-    width:70px;
-    height:130px;
-    border:2px solid #111;
-    cursor:pointer;
-    transition:0.3s;
-    box-shadow:0 5px 15px rgba(0,0,0,0.5);
+  width: 80px;
+  height: 120px;
+  background: #2f6fa3;
+  margin: 10px;
+  border-radius: 5px;
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.2s;
 }
 
 .locker:hover {
-    transform:scale(1.1);
+  transform: scale(1.1);
 }
 
 /* MANIGLIA */
 .handle {
-    position:absolute;
-    width:10px;
-    height:10px;
-    background:black;
-    right:5px;
-    top:50%;
+  width: 8px;
+  height: 25px;
+  background: #ccc;
+  position: absolute;
+  right: 5px;
+  top: 45px;
+  border-radius: 2px;
 }
 
-/* LOOT POPUP */
-#loot {
-    display:none;
-    position:absolute;
-    top:50%;
-    left:50%;
-    transform:translate(-50%,-50%);
-    background:black;
-    color:white;
-    padding:40px;
-    font-size:30px;
-    border:2px solid white;
-    text-align:center;
+/* CONTENITORI ARMADIETTI */
+.side {
+  position: absolute;
+  top: 100px;
+  display: flex;
+  flex-direction: column;
+}
+
+.side.leftSide {
+  left: 40px;
+}
+
+.side.rightSide {
+  right: 40px;
+}
+
+/* LOOT */
+.loot {
+  position: absolute;
+  color: yellow;
+  font-weight: bold;
+  font-size: 18px;
+  pointer-events: none;
+  animation: fade 1s forwards;
+}
+
+@keyframes fade {
+  0% {opacity:1; transform:translateY(0);}
+  100% {opacity:0; transform:translateY(-30px);}
 }
 
 /* BOTTONE */
-#avanti {
-    position:absolute;
-    bottom:30px;
-    right:30px;
-    padding:20px 40px;
-    font-size:20px;
-    cursor:pointer;
-    background:white;
-    border:none;
+button {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
 }
 </style>
 </head>
 
 <body>
 
-<div id="game">
-    <div id="corridor">
-        <div class="floor"></div>
-        <div class="wall left"></div>
-        <div class="wall right"></div>
+<div class="scene">
+  <div class="corridor" id="corridor">
+    <div class="floor"></div>
+    <div class="wall left"></div>
+    <div class="wall right"></div>
 
-        <div class="light"></div>
-    </div>
+    <div class="side leftSide" id="leftSide"></div>
+    <div class="side rightSide" id="rightSide"></div>
+  </div>
 </div>
 
-<div id="loot"></div>
-<button id="avanti">AVANTI</button>
+<button onclick="avanza()">AVANTI</button>
 
 <script>
+const leftSide = document.getElementById("leftSide");
+const rightSide = document.getElementById("rightSide");
 
-let corridor = document.getElementById("corridor");
-let loot = document.getElementById("loot");
-
-let depth = 0;
-
-let lootItems = [
-    "LOOT",
-    "ORO",
-    "SPADA",
-    "POZIONE",
-    "CHIAVE",
-    "LOOT LOOT LOOT"
-];
-
-function coloreRandom(){
-    let colori = ["#3498db","#e74c3c","#2ecc71","#f1c40f","#9b59b6"];
-    return colori[Math.floor(Math.random()*colori.length)];
-}
-
-function lootRandom(){
-    return lootItems[Math.floor(Math.random()*lootItems.length)];
-}
-
+/* CREA ARMADIETTI */
 function creaArmadietti() {
+  leftSide.innerHTML = "";
+  rightSide.innerHTML = "";
 
-    document
+  for (let i = 0; i < 6; i++) {
+    leftSide.appendChild(creaLocker());
+    rightSide.appendChild(creaLocker());
+  }
+}
+
+/* SINGOLO ARMADIETTO */
+function creaLocker() {
+  const locker = document.createElement("div");
+  locker.className = "locker";
+
+  const handle = document.createElement("div");
+  handle.className = "handle";
+
+  locker.appendChild(handle);
+
+  locker.onclick = function(e) {
+    const loot = document.createElement("div");
+    loot.className = "loot";
+    loot.innerText = "LOOT";
+
+    loot.style.left = e.clientX + "px";
+    loot.style.top = e.clientY + "px";
+
+    document.body.appendChild(loot);
+
+    setTimeout(() => loot.remove(), 1000);
+  };
+
+  return locker;
+}
+
+/* AVANZA */
+function avanza() {
+  const corr = document.getElementById("corridor");
+  corr.style.transform = "translateZ(-100px)";
+
+  setTimeout(() => {
+    corr.style.transform = "translateZ(0)";
+    creaArmadietti();
+  }, 300);
+}
+
+/* AVVIO */
+creaArmadietti();
+</script>
+
+</body>
+</html>
