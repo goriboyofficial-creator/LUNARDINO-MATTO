@@ -16,7 +16,7 @@
   #crosshair {
     position: absolute; top: 50%; left: 50%; width: 6px; height: 6px;
     margin: -3px 0 0 -3px; background: #fff; border-radius: 50%;
-    opacity: 0.7; pointer-events: none; z-index: 5;
+    opacity: 0.7; pointer-events: none; z-index: 5; display: none;
   }
   #hud {
     position: absolute; bottom: 10px; left: 10px; color: #fff;
@@ -29,9 +29,199 @@
 <div id="overlay">
   <h1>Corridoio Infinito</h1>
   <p>Clicca per iniziare</p>
-  <p>WASD / frecce per muoverti — Mouse per guardarti intorno — ESC per uscire</p>
+  <p>WASD / frecce per muoverti — Mouse per guardarti intorno — Q/E per girarti — ESC per uscire</p>
 </div>
 <div id="crosshair"></div>
 <div id="hud">Distanza percorsa: <span id="dist">0</span> m</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function() {
+  "use strict";
+
+  // ---------- SETUP BASE ----------
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x05060a);
+  scene.fog = new THREE.Fog(0x05060a, 5, 45);
+
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(0, 1.7, 0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // ---------- LUCE AMBIENTE ----------
+  scene.add(new THREE.AmbientLight(0x404050, 0.6));
+
+  // ---------- PARAMETRI CORRIDOIO ----------
+  const CORRIDOR_WIDTH = 6;
+  const CORRIDOR_HEIGHT = 4;
+  const SEGMENT_LENGTH = 10;
+  const SEGMENTS_AHEAD = 6;
+  const SEGMENTS_BEHIND = 2;
+
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x2b2b30, roughness: 0.9 });
+  const ceilMat  = new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 1.0 });
+  const wallMat  = new THREE.MeshStandardMaterial({ color: 0x3a3a42, roughness: 0.8 });
+
+  const lockerColors = [0xc0392b, 0x2980b9, 0x27ae60, 0xf39c12, 0x8e44ad, 0x16a085, 0xd35400, 0x7f8c8d, 0xe74c3c, 0x2c3e50];
+
+  const segments = [];
+
+  function randomLocker(sideSign) {
+    const width = 0.6 + Math.random() * 0.6;
+    const height = 1.4 + Math.random() * 1.1;
+    const depth = 0.4 + Math.random() * 0.4;
+    const color = lockerColors[Math.floor(Math.random() * lockerColors.length)];
+
+    const geo = new THREE.BoxGeometry(width, height, depth);
+    const mat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.3 });
+    const mesh = new THREE.Mesh(geo, mat);
+
+    const wallX = sideSign * (CORRIDOR_WIDTH / 2);
+    mesh.position.x = wallX - sideSign * (depth / 2);
+    mesh.position.y = height / 2;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+
+    const handleGeo = new THREE.BoxGeometry(0.05, 0.15, 0.05);
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.8, roughness: 0.2 });
+    const handle = new THREE.Mesh(handleGeo, handleMat);
+    handle.position.set(sideSign * (width / 2 - 0.08), 0, sideSign * (depth / 2 + 0.03));
+    mesh.add(handle);
+
+    return mesh;
+  }
+
+  function buildSegment(index) {
+    const group = new THREE.Group();
+    const zStart = -index * SEGMENT_LENGTH;
+    group.position.z = zStart;
+
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(CORRIDOR_WIDTH, SEGMENT_LENGTH), floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(0, 0, -SEGMENT_LENGTH / 2);
+    floor.receiveShadow = true;
+    group.add(floor);
+
+    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(CORRIDOR_WIDTH, SEGMENT_LENGTH), ceilMat);
+    ceiling.rotation.x = Math.PI / 2;
+    ceiling.position.set(0, CORRIDOR_HEIGHT, -SEGMENT_LENGTH / 2);
+    group.add(ceiling);
+
+    const wallL = new THREE.Mesh(new THREE.PlaneGeometry(SEGMENT_LENGTH, CORRIDOR_HEIGHT), wallMat);
+    wallL.rotation.y = Math.PI / 2;
+    wallL.position.set(-CORRIDOR_WIDTH / 2, CORRIDOR_HEIGHT / 2, -SEGMENT_LENGTH / 2);
+    group.add(wallL);
+
+    const wallR = new THREE.Mesh(new THREE.PlaneGeometry(SEGMENT_LENGTH, CORRIDOR_HEIGHT), wallMat);
+    wallR.rotation.y = -Math.PI / 2;
+    wallR.position.set(CORRIDOR_WIDTH / 2, CORRIDOR_HEIGHT / 2, -SEGMENT_LENGTH / 2);
+    group.add(wallR);
+
+    const light = new THREE.PointLight(0xfff2cc, 1.4, 12, 2);
+    light.position.set(0, CORRIDOR_HEIGHT - 0.3, -SEGMENT_LENGTH / 2);
+    group.add(light);
+
+    const fixture = new THREE.Mesh(
+      new THREE.BoxGeometry(1.2, 0.1, 0.4),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffcc, emissiveIntensity: 0.8 })
+    );
+    fixture.position.set(0, CORRIDOR_HEIGHT - 0.05, -SEGMENT_LENGTH / 2);
+    group.add(fixture);
+
+    const lockersPerSide = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < lockersPerSide; i++) {
+      const zPos = -(i + 0.5) * (SEGMENT_LENGTH / lockersPerSide) + (Math.random() * 0.6 - 0.3);
+
+      const left = randomLocker(-1);
+      left.position.z = zPos;
+      group.add(left);
+
+      const right = randomLocker(1);
+      right.position.z = zPos;
+      group.add(right);
+    }
+
+    scene.add(group);
+    return { group, index };
+  }
+
+  function ensureSegments(playerIndex) {
+    const maxIndex = playerIndex + SEGMENTS_AHEAD;
+    while (segments.length === 0 || segments[segments.length - 1].index < maxIndex) {
+      const nextIndex = segments.length === 0 ? 0 : segments[segments.length - 1].index + 1;
+      segments.push(buildSegment(nextIndex));
+    }
+    while (segments.length > 0 && segments[0].index < playerIndex - SEGMENTS_BEHIND) {
+      const old = segments.shift();
+      scene.remove(old.group);
+      old.group.traverse((obj) => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) obj.material.dispose();
+      });
+    }
+  }
+
+  ensureSegments(0);
+
+  // ---------- CONTROLLI ----------
+  let yaw = 0, pitch = 0;
+  const keys = {};
+  let started = false;      // il gioco è partito (click fatto)
+  let pointerLocked = false; // il mouse è davvero agganciato
+
+  const overlay = document.getElementById("overlay");
+  const crosshair = document.getElementById("crosshair");
+
+  function startGame() {
+    if (started) return;
+    started = true;
+    overlay.style.display = "none";
+    crosshair.style.display = "block";
+
+    // proviamo il pointer lock, ma il gioco parte comunque anche se fallisce
+    const el = renderer.domElement;
+    const req = el.requestPointerLock && el.requestPointerLock();
+    if (req && typeof req.catch === "function") {
+      req.catch(() => { /* ignoriamo: si gioca comunque senza lock */ });
+    }
+  }
+
+  overlay.addEventListener("click", startGame);
+
+  document.addEventListener("pointerlockchange", () => {
+    pointerLocked = document.pointerLockElement === renderer.domElement;
+  });
+
+  document.addEventListener("pointerlockerror", () => {
+    pointerLocked = false; // niente lock, ma il gioco resta giocabile con Q/E e mouse "libero"
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!started) return;
+    yaw -= e.movementX * 0.0022;
+    pitch -= e.movementY * 0.0022;
+    pitch = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, pitch));
+  });
+
+  window.addEventListener("keydown", (e) => { keys[e.code] = true; });
+  window.addEventListener("keyup", (e) => { keys[e.code] = false; });
+
+  // ---------- LOOP ----------
+  const clock = new THREE.Clock();
+  const MOVE_SPEED = 4.2;
+  const TURN_SPEED = 1.8; // rad/sec per Q/E
+  const BOUND = CORRIDOR_WIDTH / 2 - 0.6;
+  const distEl = document.getElementById("dist");
+  let traveled = 0;
+
+  function a
