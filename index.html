@@ -7,44 +7,108 @@
 <style>
 body {
     margin:0;
-    background:#111;
-    color:white;
-    font-family:Arial;
     overflow:hidden;
+    background:black;
+    font-family:Arial;
 }
 
+/* SCENA */
 #game {
+    perspective: 900px;
     width:100vw;
     height:100vh;
-    background:linear-gradient(#333,#111);
     position:relative;
 }
 
+/* CORRIDOIO */
+#corridor {
+    position:absolute;
+    width:100%;
+    height:100%;
+    transform-style: preserve-3d;
+    transition: transform 0.6s ease;
+}
+
+/* PAVIMENTO */
+.floor {
+    position:absolute;
+    width:100%;
+    height:100%;
+    background:linear-gradient(#555,#111);
+    transform: rotateX(75deg) translateZ(-300px);
+}
+
+/* PARETI */
+.wall {
+    position:absolute;
+    width:50%;
+    height:100%;
+    background:linear-gradient(#333,#111);
+}
+
+.left {
+    left:0;
+    transform: rotateY(25deg);
+}
+
+.right {
+    right:0;
+    transform: rotateY(-25deg);
+}
+
+/* LUCI */
+.light {
+    position:absolute;
+    width:80px;
+    height:10px;
+    background:white;
+    top:20px;
+    left:50%;
+    transform:translateX(-50%);
+    box-shadow:0 0 20px white;
+}
+
+/* ARMADIETTI */
 .locker {
     position:absolute;
     width:70px;
-    height:120px;
-    background:#777;
-    border:4px solid #333;
+    height:130px;
+    border:2px solid #111;
     cursor:pointer;
+    transition:0.3s;
+    box-shadow:0 5px 15px rgba(0,0,0,0.5);
 }
 
 .locker:hover {
-    background:#aaa;
+    transform:scale(1.1);
 }
 
+/* MANIGLIA */
+.handle {
+    position:absolute;
+    width:10px;
+    height:10px;
+    background:black;
+    right:5px;
+    top:50%;
+}
+
+/* LOOT POPUP */
 #loot {
     display:none;
     position:absolute;
-    top:40%;
+    top:50%;
     left:50%;
     transform:translate(-50%,-50%);
     background:black;
-    border:2px solid white;
-    padding:30px;
+    color:white;
+    padding:40px;
     font-size:30px;
+    border:2px solid white;
+    text-align:center;
 }
 
+/* BOTTONE */
 #avanti {
     position:absolute;
     bottom:30px;
@@ -52,79 +116,52 @@ body {
     padding:20px 40px;
     font-size:20px;
     cursor:pointer;
+    background:white;
+    border:none;
 }
-
 </style>
 </head>
 
 <body>
 
-<div id="game"></div>
+<div id="game">
+    <div id="corridor">
+        <div class="floor"></div>
+        <div class="wall left"></div>
+        <div class="wall right"></div>
 
-<div id="loot">LOOT</div>
+        <div class="light"></div>
+    </div>
+</div>
 
+<div id="loot"></div>
 <button id="avanti">AVANTI</button>
-
 
 <script>
 
-let passo=0;
-let game=document.getElementById("game");
-let loot=document.getElementById("loot");
+let corridor = document.getElementById("corridor");
+let loot = document.getElementById("loot");
 
+let depth = 0;
 
-function creaArmadietti(){
+let lootItems = [
+    "LOOT",
+    "ORO",
+    "SPADA",
+    "POZIONE",
+    "CHIAVE",
+    "LOOT LOOT LOOT"
+];
 
-game.innerHTML="";
-
-for(let i=0;i<6;i++){
-
-let sinistra=document.createElement("div");
-sinistra.className="locker";
-
-sinistra.style.left="15%";
-sinistra.style.top=(100+i*100)+"px";
-
-sinistra.onclick=function(){
-loot.style.display="block";
-loot.innerHTML="LOOT";
+function coloreRandom(){
+    let colori = ["#3498db","#e74c3c","#2ecc71","#f1c40f","#9b59b6"];
+    return colori[Math.floor(Math.random()*colori.length)];
 }
 
-game.appendChild(sinistra);
-
-
-
-let destra=document.createElement("div");
-destra.className="locker";
-
-destra.style.right="15%";
-destra.style.top=(100+i*100)+"px";
-
-destra.onclick=function(){
-loot.style.display="block";
-loot.innerHTML="LOOT";
+function lootRandom(){
+    return lootItems[Math.floor(Math.random()*lootItems.length)];
 }
 
-game.appendChild(destra);
+function creaArmadietti() {
 
-}
-
-}
-
-
-document.getElementById("avanti").onclick=function(){
-
-passo++;
-
-creaArmadietti();
-
-}
-
-
-
-creaArmadietti();
-
-</script>
-
-</body>
-</html>
+    document
