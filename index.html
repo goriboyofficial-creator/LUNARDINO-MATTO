@@ -8,11 +8,19 @@
   #overlay {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     display: flex; align-items: center; justify-content: center;
-    flex-direction: column; color: #fff; background: rgba(0,0,0,0.75);
-    z-index: 10; text-align: center; cursor: pointer;
+    flex-direction: column; color: #fff; background: rgba(0,0,0,0.85);
+    z-index: 100; text-align: center; cursor: pointer; padding: 20px; box-sizing: border-box;
   }
   #overlay h1 { margin-bottom: 10px; }
   #overlay p { margin: 4px 0; opacity: 0.85; }
+  #startBtn {
+    margin-top: 20px; padding: 14px 34px; font-size: 18px; font-weight: bold;
+    background: #2980b9; color: #fff; border: none; border-radius: 6px; cursor: pointer;
+  }
+  #startBtn:hover { background: #3498db; }
+  #errorBox {
+    margin-top: 20px; color: #ff6b6b; font-size: 13px; max-width: 500px; white-space: pre-wrap;
+  }
   #crosshair {
     position: absolute; top: 50%; left: 50%; width: 6px; height: 6px;
     margin: -3px 0 0 -3px; background: #fff; border-radius: 50%;
@@ -28,8 +36,9 @@
 
 <div id="overlay">
   <h1>Corridoio Infinito</h1>
-  <p>Clicca per iniziare</p>
   <p>WASD / frecce per muoverti — Mouse per guardarti intorno — Q/E per girarti — ESC per uscire</p>
+  <button id="startBtn" type="button">CLICCA QUI PER INIZIARE</button>
+  <div id="errorBox"></div>
 </div>
 <div id="crosshair"></div>
 <div id="hud">Distanza percorsa: <span id="dist">0</span> m</div>
@@ -39,18 +48,60 @@
 (function() {
   "use strict";
 
-  // ---------- SETUP BASE ----------
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x05060a);
-  scene.fog = new THREE.Fog(0x05060a, 5, 45);
+  const overlay = document.getElementById("overlay");
+  const errorBox = document.getElementById("errorBox");
+  const startBtn = document.getElementById("startBtn");
+  const crosshair = document.getElementById("crosshair");
+  const distEl = document.getElementById("dist");
 
-  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
-  camera.position.set(0, 1.7, 0);
+  function showError(msg) {
+    errorBox.textContent = "Problema rilevato: " + msg;
+    console.error(msg);
+  }
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.shadowMap.enabled = true;
-  document.body.appendChild(renderer.domElement);
+  window.addEventListener("error", (e) => {
+    showError(e.message || "errore sconosciuto durante il caricamento.");
+  });
+
+  if (typeof THREE === "undefined") {
+    showError("La libreria 3D (Three.js) non si è caricata. Controlla la connessione a internet, o che nessun blocco script/adblock stia impedendo il caricamento da cdnjs.cloudflare.com.");
+    return;
+  }
+
+  function hasWebGL() {
+    try {
+      const canvas = document.createElement("canvas");
+      return !!(window.WebGLRenderingContext &&
+        (canvas.getContext("webgl") || canvas.getContext("experimental-webgl")));
+    } catch (e) {
+      return false;
+    }
+  }
+  if (!hasWebGL()) {
+    showError("Questo browser/dispositivo non supporta WebGL, necessario per la grafica 3D. Prova con un browser aggiornato (Chrome, Edge, Firefox) su un altro dispositivo.");
+    return;
+  }
+
+  let scene, camera, renderer;
+  let started = false;
+  let pointerLocked = false;
+
+  try {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x05060a);
+    scene.fog = new THREE.Fog(0x05060a, 5, 45);
+
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
+    camera.position.set(0, 1.7, 0);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+  } catch (e) {
+    showError("Impossibile inizializzare il renderer 3D: " + e.message);
+    return;
+  }
 
   window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -58,10 +109,8 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  // ---------- LUCE AMBIENTE ----------
   scene.add(new THREE.AmbientLight(0x404050, 0.6));
 
-  // ---------- PARAMETRI CORRIDOIO ----------
   const CORRIDOR_WIDTH = 6;
   const CORRIDOR_HEIGHT = 4;
   const SEGMENT_LENGTH = 10;
@@ -173,14 +222,8 @@
 
   ensureSegments(0);
 
-  // ---------- CONTROLLI ----------
   let yaw = 0, pitch = 0;
   const keys = {};
-  let started = false;      // il gioco è partito (click fatto)
-  let pointerLocked = false; // il mouse è davvero agganciato
-
-  const overlay = document.getElementById("overlay");
-  const crosshair = document.getElementById("crosshair");
 
   function startGame() {
     if (started) return;
@@ -188,22 +231,23 @@
     overlay.style.display = "none";
     crosshair.style.display = "block";
 
-    // proviamo il pointer lock, ma il gioco parte comunque anche se fallisce
-    const el = renderer.domElement;
-    const req = el.requestPointerLock && el.requestPointerLock();
-    if (req && typeof req.catch === "function") {
-      req.catch(() => { /* ignoriamo: si gioca comunque senza lock */ });
-    }
+    try {
+      const el = renderer.domElement;
+      if (el.requestPointerLock) {
+        const req = el.requestPointerLock();
+        if (req && typeof req.catch === "function") {
+          req.catch(() => {});
+        }
+      }
+    } catch (e) {}
   }
 
+  startBtn.addEventListener("click", (e) => { e.stopPropagation(); startGame(); });
   overlay.addEventListener("click", startGame);
+  overlay.addEventListener("touchstart", startGame, { passive: true });
 
   document.addEventListener("pointerlockchange", () => {
     pointerLocked = document.pointerLockElement === renderer.domElement;
-  });
-
-  document.addEventListener("pointerlockerror", () => {
-    pointerLocked = false; // niente lock, ma il gioco resta giocabile con Q/E e mouse "libero"
   });
 
   document.addEventListener("mousemove", (e) => {
@@ -213,15 +257,64 @@
     pitch = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, pitch));
   });
 
-  window.addEventListener("keydown", (e) => { keys[e.code] = true; });
+  window.addEventListener("keydown", (e) => {
+    keys[e.code] = true;
+    if (e.code === "Escape" && document.exitPointerLock) document.exitPointerLock();
+  });
   window.addEventListener("keyup", (e) => { keys[e.code] = false; });
 
-  // ---------- LOOP ----------
   const clock = new THREE.Clock();
   const MOVE_SPEED = 4.2;
-  const TURN_SPEED = 1.8; // rad/sec per Q/E
+  const TURN_SPEED = 1.8;
   const BOUND = CORRIDOR_WIDTH / 2 - 0.6;
-  const distEl = document.getElementById("dist");
   let traveled = 0;
 
-  function a
+  function animate() {
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.1);
+
+    if (started) {
+      if (keys["KeyQ"]) yaw += TURN_SPEED * dt;
+      if (keys["KeyE"]) yaw -= TURN_SPEED * dt;
+    }
+
+    camera.rotation.order = "YXZ";
+    camera.rotation.y = yaw;
+    camera.rotation.x = pitch;
+
+    if (started) {
+      const forward = new THREE.Vector3(Math.sin(-yaw), 0, -Math.cos(-yaw));
+      const right = new THREE.Vector3(forward.z, 0, -forward.x);
+
+      let moveX = 0, moveZ = 0;
+      if (keys["KeyW"] || keys["ArrowUp"]) moveZ += 1;
+      if (keys["KeyS"] || keys["ArrowDown"]) moveZ -= 1;
+      if (keys["KeyD"] || keys["ArrowRight"]) moveX += 1;
+      if (keys["KeyA"] || keys["ArrowLeft"]) moveX -= 1;
+
+      const dir = new THREE.Vector3();
+      dir.addScaledVector(forward, moveZ);
+      dir.addScaledVector(right, moveX);
+      if (dir.lengthSq() > 0) {
+        dir.normalize();
+        camera.position.addScaledVector(dir, MOVE_SPEED * dt);
+        traveled += MOVE_SPEED * dt;
+      }
+
+      camera.position.x = Math.max(-BOUND, Math.min(BOUND, camera.position.x));
+      camera.position.y = 1.7;
+    }
+
+    const playerIndex = Math.floor(-camera.position.z / SEGMENT_LENGTH);
+    ensureSegments(playerIndex);
+
+    distEl.textContent = Math.floor(traveled);
+
+    renderer.render(scene, camera);
+  }
+
+  animate();
+})();
+</script>
+</body>
+</html>
