@@ -30,18 +30,33 @@
     position: absolute; bottom: 10px; left: 10px; color: #fff;
     font-size: 13px; opacity: 0.6; z-index: 5; pointer-events: none;
   }
+  #interactPrompt {
+    position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%);
+    color: #fff; background: rgba(0,0,0,0.55); padding: 7px 16px; border-radius: 6px;
+    font-size: 14px; display: none; z-index: 6; pointer-events: none; font-weight: bold;
+  }
+  #foundPopup {
+    position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
+    color: #fff; background: rgba(20,20,20,0.9); padding: 12px 24px; border-radius: 8px;
+    font-size: 17px; font-weight: bold; opacity: 0; transition: opacity 0.4s ease;
+    z-index: 6; pointer-events: none; border: 1px solid rgba(255,255,255,0.2); text-align: center;
+  }
+  #foundPopup.visible { opacity: 1; }
 </style>
 </head>
 <body>
 
 <div id="overlay">
   <h1>Corridoio Infinito</h1>
-  <p>WASD / frecce per muoverti — Mouse per guardarti intorno — Q/E per girarti — ESC per uscire</p>
+  <p>WASD / frecce per muoverti — Mouse per guardarti intorno — Q/E per girarti</p>
+  <p>F per aprire gli armadietti — ESC per uscire</p>
   <button id="startBtn" type="button">CLICCA QUI PER INIZIARE</button>
   <div id="errorBox"></div>
 </div>
 <div id="crosshair"></div>
 <div id="hud">Distanza percorsa: <span id="dist">0</span> m</div>
+<div id="interactPrompt">Premi F per aprire l'armadietto</div>
+<div id="foundPopup"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -53,6 +68,8 @@
   const startBtn = document.getElementById("startBtn");
   const crosshair = document.getElementById("crosshair");
   const distEl = document.getElementById("dist");
+  const interactPrompt = document.getElementById("interactPrompt");
+  const foundPopup = document.getElementById("foundPopup");
 
   function showError(msg) {
     errorBox.textContent = "Problema rilevato: " + msg;
@@ -124,36 +141,166 @@
   const lockerColors = [0xc0392b, 0x2980b9, 0x27ae60, 0xf39c12, 0x8e44ad, 0x16a085, 0xd35400, 0x7f8c8d, 0xe74c3c, 0x2c3e50];
 
   const segments = [];
+  const interactables = [];
+  let currentTarget = null;
 
-  function randomLocker(sideSign) {
-    const width = 0.6 + Math.random() * 0.6;
-    const height = 1.4 + Math.random() * 1.1;
-    const depth = 0.4 + Math.random() * 0.4;
+  function createRandomItem() {
+    const pool = [
+      () => {
+        const g = new THREE.Group();
+        const can = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.14, 16), new THREE.MeshStandardMaterial({ color: 0xcc0000, metalness: 0.6, roughness: 0.3 }));
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(0.047, 0.047, 0.03, 16), new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.2, roughness: 0.5 }));
+        band.position.y = 0.02;
+        g.add(can, band);
+        return { mesh: g, name: "una lattina di Coca-Cola" };
+      },
+      () => {
+        const g = new THREE.Group();
+        const lensMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.3, metalness: 0.6 });
+        const lensL = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.008, 8, 16), lensMat);
+        lensL.position.x = -0.045;
+        const lensR = lensL.clone();
+        lensR.position.x = 0.045;
+        const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.006, 0.006), lensMat);
+        g.add(lensL, lensR, bridge);
+        return { mesh: g, name: "un paio di occhiali" };
+      },
+      () => {
+        const g = new THREE.Group();
+        for (let i = 0; i < 5; i++) {
+          const bill = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.008, 0.06), new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.7 }));
+          bill.position.y = i * 0.01;
+          bill.rotation.y = (Math.random() - 0.5) * 0.3;
+          g.add(bill);
+        }
+        return { mesh: g, name: "un fascio di banconote" };
+      },
+      () => {
+        const g = new THREE.Group();
+        const book = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.03, 0.1), new THREE.MeshStandardMaterial({ color: 0x6d4c41, roughness: 0.8 }));
+        g.add(book);
+        return { mesh: g, name: "un vecchio libro" };
+      },
+      () => {
+        const g = new THREE.Group();
+        const metalMat = new THREE.MeshStandardMaterial({ color: 0xbbbbbb, metalness: 0.9, roughness: 0.2 });
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.025, 0.004, 8, 16), metalMat);
+        const key = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.05, 0.01), metalMat);
+        key.position.y = -0.03;
+        g.add(ring, key);
+        return { mesh: g, name: "un mazzo di chiavi" };
+      },
+      () => {
+        const g = new THREE.Group();
+        const phone = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.12, 0.008), new THREE.MeshStandardMaterial({ color: 0x0d0d0d, roughness: 0.4, metalness: 0.4 }));
+        const screen = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 0.002), new THREE.MeshStandardMaterial({ color: 0x3399ff, emissive: 0x2266aa, emissiveIntensity: 0.4 }));
+        screen.position.z = 0.006;
+        g.add(phone, screen);
+        return { mesh: g, name: "un vecchio cellulare" };
+      },
+      () => {
+        const g = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.14, 12), new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.7, roughness: 0.3 }));
+        const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.02, 0.03, 12), new THREE.MeshStandardMaterial({ color: 0xffe08a, emissive: 0xffcc55, emissiveIntensity: 0.5 }));
+        tip.position.y = 0.085;
+        g.add(body, tip);
+        return { mesh: g, name: "una torcia" };
+      },
+      () => {
+        const g = new THREE.Group();
+        const metalMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.8, roughness: 0.2 });
+        const face = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.01, 16), metalMat);
+        face.rotation.x = Math.PI / 2;
+        const strapMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
+        const strap = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.09, 0.005), strapMat);
+        g.add(face, strap);
+        return { mesh: g, name: "un orologio da polso" };
+      },
+      () => null
+    ];
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    return pick();
+  }
+
+  function showPopup(text) {
+    foundPopup.textContent = text;
+    foundPopup.classList.add("visible");
+    clearTimeout(showPopup._t);
+    showPopup._t = setTimeout(() => foundPopup.classList.remove("visible"), 3000);
+  }
+
+  function openLocker(entry) {
+    const data = entry.data;
+    if (data.opened) return;
+    data.opened = true;
+    data.opening = true;
+
+    const found = createRandomItem();
+    if (found) {
+      found.mesh.position.set(0.16, data.h * 0.5, 0);
+      data.group.add(found.mesh);
+      showPopup("Hai trovato: " + found.name + "!");
+    } else {
+      showPopup("L'armadietto è vuoto...");
+    }
+  }
+
+  function createInteractiveLocker(sideSign) {
+    const w = 0.6 + Math.random() * 0.6;
+    const h = 1.4 + Math.random() * 1.1;
+    const d = 0.4 + Math.random() * 0.4;
     const color = lockerColors[Math.floor(Math.random() * lockerColors.length)];
 
-    const geo = new THREE.BoxGeometry(width, height, depth);
-    const mat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.3 });
-    const mesh = new THREE.Mesh(geo, mat);
+    const group = new THREE.Group();
+
+    const back = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, h, w),
+      new THREE.MeshStandardMaterial({ color: 0x111114, roughness: 0.9 })
+    );
+    back.position.set(0.025, h / 2, 0);
+    group.add(back);
+
+    const hinge = new THREE.Group();
+    hinge.position.set(d, 0, -w / 2);
+    group.add(hinge);
+
+    const door = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, h * 0.95, w * 0.95),
+      new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.3 })
+    );
+    door.position.set(0, h / 2, (w * 0.95) / 2);
+    door.castShadow = true;
+    hinge.add(door);
+
+    const handle = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.04, 0.15),
+      new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.8, roughness: 0.2 })
+    );
+    handle.position.set(0.035, 0, (w * 0.95) / 2 - 0.12);
+    door.add(handle);
+
+    const hitZone = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    hitZone.rotation.y = Math.PI / 2;
+    hitZone.position.set(d, h / 2, 0);
+    group.add(hitZone);
 
     const wallX = sideSign * (CORRIDOR_WIDTH / 2);
-    mesh.position.x = wallX - sideSign * (depth / 2);
-    mesh.position.y = height / 2;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    group.position.x = wallX;
+    if (sideSign > 0) group.rotation.y = Math.PI;
 
-    const handleGeo = new THREE.BoxGeometry(0.05, 0.15, 0.05);
-    const handleMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.8, roughness: 0.2 });
-    const handle = new THREE.Mesh(handleGeo, handleMat);
-    handle.position.set(sideSign * (width / 2 - 0.08), 0, sideSign * (depth / 2 + 0.03));
-    mesh.add(handle);
-
-    return mesh;
+    const data = { opened: false, opening: false, animProgress: 0, hinge, group, h };
+    const entry = { mesh: hitZone, data };
+    return { group, entry };
   }
 
   function buildSegment(index) {
     const group = new THREE.Group();
     const zStart = -index * SEGMENT_LENGTH;
     group.position.z = zStart;
+    const entries = [];
 
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(CORRIDOR_WIDTH, SEGMENT_LENGTH), floorMat);
     floor.rotation.x = -Math.PI / 2;
@@ -191,27 +338,36 @@
     for (let i = 0; i < lockersPerSide; i++) {
       const zPos = -(i + 0.5) * (SEGMENT_LENGTH / lockersPerSide) + (Math.random() * 0.6 - 0.3);
 
-      const left = randomLocker(-1);
-      left.position.z = zPos;
-      group.add(left);
+      const leftBuilt = createInteractiveLocker(-1);
+      leftBuilt.group.position.z = zPos;
+      group.add(leftBuilt.group);
+      entries.push(leftBuilt.entry);
 
-      const right = randomLocker(1);
-      right.position.z = zPos;
-      group.add(right);
+      const rightBuilt = createInteractiveLocker(1);
+      rightBuilt.group.position.z = zPos;
+      group.add(rightBuilt.group);
+      entries.push(rightBuilt.entry);
     }
 
     scene.add(group);
-    return { group, index };
+    return { group, index, entries };
   }
 
   function ensureSegments(playerIndex) {
     const maxIndex = playerIndex + SEGMENTS_AHEAD;
     while (segments.length === 0 || segments[segments.length - 1].index < maxIndex) {
       const nextIndex = segments.length === 0 ? 0 : segments[segments.length - 1].index + 1;
-      segments.push(buildSegment(nextIndex));
+      const seg = buildSegment(nextIndex);
+      segments.push(seg);
+      for (const entry of seg.entries) interactables.push(entry);
     }
     while (segments.length > 0 && segments[0].index < playerIndex - SEGMENTS_BEHIND) {
       const old = segments.shift();
+      for (const entry of old.entries) {
+        const idx = interactables.indexOf(entry);
+        if (idx !== -1) interactables.splice(idx, 1);
+        if (currentTarget === entry) { currentTarget = null; interactPrompt.style.display = "none"; }
+      }
       scene.remove(old.group);
       old.group.traverse((obj) => {
         if (obj.geometry) obj.geometry.dispose();
@@ -235,9 +391,7 @@
       const el = renderer.domElement;
       if (el.requestPointerLock) {
         const req = el.requestPointerLock();
-        if (req && typeof req.catch === "function") {
-          req.catch(() => {});
-        }
+        if (req && typeof req.catch === "function") req.catch(() => {});
       }
     } catch (e) {}
   }
@@ -260,6 +414,9 @@
   window.addEventListener("keydown", (e) => {
     keys[e.code] = true;
     if (e.code === "Escape" && document.exitPointerLock) document.exitPointerLock();
+    if (e.code === "KeyF" && started && currentTarget && !currentTarget.data.opened) {
+      openLocker(currentTarget);
+    }
   });
   window.addEventListener("keyup", (e) => { keys[e.code] = false; });
 
@@ -267,6 +424,8 @@
   const MOVE_SPEED = 4.2;
   const TURN_SPEED = 1.8;
   const BOUND = CORRIDOR_WIDTH / 2 - 0.6;
+  const raycaster = new THREE.Raycaster();
+  const centerNDC = new THREE.Vector2(0, 0);
   let traveled = 0;
 
   function animate() {
@@ -303,6 +462,30 @@
 
       camera.position.x = Math.max(-BOUND, Math.min(BOUND, camera.position.x));
       camera.position.y = 1.7;
+    }
+
+    for (const entry of interactables) {
+      const d = entry.data;
+      if (d.opening && d.animProgress < 1) {
+        d.animProgress = Math.min(1, d.animProgress + dt / 0.5);
+        const eased = 1 - Math.pow(1 - d.animProgress, 3);
+        d.hinge.rotation.y = -eased * (Math.PI * 0.75);
+      }
+    }
+
+    if (started) {
+      raycaster.setFromCamera(centerNDC, camera);
+      const meshList = interactables.map((e) => e.mesh);
+      const hits = meshList.length ? raycaster.intersectObjects(meshList) : [];
+      let found = null;
+      for (const hit of hits) {
+        if (hit.distance <= 2.8) {
+          const entry = interactables.find((e) => e.mesh === hit.object);
+          if (entry && !entry.data.opened) { found = entry; break; }
+        }
+      }
+      currentTarget = found;
+      interactPrompt.style.display = found ? "block" : "none";
     }
 
     const playerIndex = Math.floor(-camera.position.z / SEGMENT_LENGTH);
